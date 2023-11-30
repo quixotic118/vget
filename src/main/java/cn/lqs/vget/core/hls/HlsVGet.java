@@ -1,6 +1,5 @@
 package cn.lqs.vget.core.hls;
 
-import cn.lqs.vget.core.VGet;
 import cn.lqs.vget.core.common.HttpLogger;
 import cn.lqs.vget.core.common.utils.HttpUtils;
 import cn.lqs.vget.core.common.utils.VFileUtils;
@@ -25,7 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static cn.lqs.vget.core.common.ConcurrencyPolicy.AUTO;
 import static cn.lqs.vget.core.common.ConcurrencyPolicy.SINGLE;
 
-public class HlsVGet extends VGet {
+public class HlsVGet {
 
     private final static Logger log = LoggerFactory.getLogger(HlsVGet.class);
 

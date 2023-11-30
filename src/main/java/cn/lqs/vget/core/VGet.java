@@ -7,6 +7,7 @@ import cn.lqs.vget.core.hls.NetM3u8;
 import cn.lqs.vget.core.mp4.NetMp4VGet;
 
 import java.net.http.HttpClient;
+import java.nio.file.Path;
 
 public abstract class VGet {
 
@@ -26,4 +27,8 @@ public abstract class VGet {
     public static NetMp4VGet ofNetMp4(HttpClient httpClient, HttpHeader[] headers, String cacheDir) {
         return new NetMp4VGet(headers, httpClient, cacheDir);
     }
+
+    public abstract VDownloader createDownloader(String url, Path dst);
+
+    public abstract VDownloader createDownloader(String url, Path dst, int concurrency);
 }

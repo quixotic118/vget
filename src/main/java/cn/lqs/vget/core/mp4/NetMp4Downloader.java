@@ -1,12 +1,13 @@
 package cn.lqs.vget.core.mp4;
 
+import cn.lqs.vget.core.VDownloader;
 import cn.lqs.vget.core.common.HttpHeader;
 import cn.lqs.vget.core.exceptions.FailDownloadException;
 
 import java.net.http.HttpClient;
 import java.nio.file.Path;
 
-public abstract class NetMp4Downloader {
+public abstract class NetMp4Downloader implements VDownloader {
 
     private final HttpClient httpClient;
     private final HttpHeader[] customHeaders;
