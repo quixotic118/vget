@@ -165,7 +165,7 @@ public class NetM3u8Parser implements M3u8Parser{
         String encryptKeyIV = "";
         label:
         for (String attr : keyTag.substring(TAG_KEY.length() + 1).split(",")) {
-            if (attr.length() == 0) {
+            if (attr.isEmpty()) {
                 continue;
             }
             attr = attr.trim();
@@ -174,9 +174,6 @@ public class NetM3u8Parser implements M3u8Parser{
                     attr.substring(0, i),
                     attr.substring(i + 1)
             };
-            if (kv.length != 2) {
-                continue;
-            }
             switch (kv[0]) {
                 case "METHOD" -> {
                     if ("NONE".equals(kv[1])) {
@@ -200,7 +197,7 @@ public class NetM3u8Parser implements M3u8Parser{
     private String findNextSafely(Iterator<String> iter) {
         while (iter.hasNext()) {
             String next = iter.next();
-            if (next.trim().length() > 0) {
+            if (!next.trim().isEmpty()) {
                 return next; 
             }
         }
