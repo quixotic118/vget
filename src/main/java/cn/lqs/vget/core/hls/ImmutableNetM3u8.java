@@ -1,6 +1,7 @@
 package cn.lqs.vget.core.hls;
 
 import cn.lqs.vget.core.common.HttpHeader;
+import lombok.Getter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -10,18 +11,17 @@ public class ImmutableNetM3u8 implements NetM3u8{
     private final HttpHeader[] customHeaders;
     private final String baseUrl;
     private final double maxDuration;
+    @Getter
     private final int version;
     private final int sequence;
     private final String playlistType;
     private final boolean allowCache;
-    private final ArrayList<TsSegment> segments;
+    private final ArrayList<Segment> segments;
+    @Getter
+    private final String videoHeadUrl;
 
     public double getMaxDuration() {
         return maxDuration;
-    }
-
-    public int getVersion() {
-        return version;
     }
 
     public HttpHeader[] getCustomHeaders() {
@@ -36,13 +36,20 @@ public class ImmutableNetM3u8 implements NetM3u8{
         return playlistType;
     }
 
-    public ArrayList<TsSegment> getSegments() {
+    public ArrayList<Segment> getSegments() {
         return segments;
+    }
+
+
+    protected ImmutableNetM3u8(HttpHeader[] customHeaders, String baseUrl,
+                               double maxDuration, int version, int sequence, String playlistType,
+                               boolean allowCache, ArrayList<Segment> segments) {
+        this(customHeaders, baseUrl, maxDuration, version, sequence, playlistType, allowCache, segments, "");
     }
 
     protected ImmutableNetM3u8(HttpHeader[] customHeaders, String baseUrl,
                                double maxDuration, int version, int sequence, String playlistType,
-                               boolean allowCache, ArrayList<TsSegment> segments) {
+                               boolean allowCache, ArrayList<Segment> segments, String videoHeadUrl) {
         this.customHeaders = customHeaders;
         this.baseUrl = baseUrl;
         this.maxDuration = maxDuration;
@@ -51,6 +58,7 @@ public class ImmutableNetM3u8 implements NetM3u8{
         this.playlistType = playlistType;
         this.allowCache = allowCache;
         this.segments = segments;
+        this.videoHeadUrl = videoHeadUrl;
     }
 
     public String getBaseUrl() {
@@ -94,7 +102,12 @@ public class ImmutableNetM3u8 implements NetM3u8{
     }
 
     @Override
-    public List<TsSegment> segments() {
+    public List<Segment> segments() {
         return segments;
+    }
+
+    @Override
+    public String videoHeadURI() {
+        return videoHeadUrl;
     }
 }

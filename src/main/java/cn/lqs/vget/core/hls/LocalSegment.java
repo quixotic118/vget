@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class LocalTsSegFile {
+public class LocalSegment {
     private int order;
     private String path;
 }

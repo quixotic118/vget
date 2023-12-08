@@ -13,7 +13,7 @@ public class PartM3u8 implements M3u8{
     private int sequence;
     private String playlistType;
     private boolean allowCache;
-    private List<TsSegment> segments;
+    private List<Segment> segments;
 
     private boolean hasDecoded = false;
 
@@ -26,7 +26,7 @@ public class PartM3u8 implements M3u8{
         this.parentSequence = parentSequence;
     }
 
-    public PartM3u8(int partition, int parentSequence, int version, double maxTsDuration, int sequence, String playlistType, boolean allowCache, List<TsSegment> segments) {
+    public PartM3u8(int partition, int parentSequence, int version, double maxTsDuration, int sequence, String playlistType, boolean allowCache, List<Segment> segments) {
         this.partition = partition;
         this.parentSequence = parentSequence;
         this.version = version;
@@ -53,7 +53,7 @@ public class PartM3u8 implements M3u8{
             sb.append(TAG_PLAYLIST_TYPE).append(":").append(TAG_PLAYLIST_TYPE_VOD).append("\n");
         }
         if (isEncrypt() && !hasDecoded) {
-            TsSegment seg = this.segments.get(0);
+            Segment seg = this.segments.get(0);
             sb.append(TAG_KEY).append(":").append("METHOD").append("=").append(seg.encryptInfo().encryptedMethod())
                     .append(",URI=\"").append(M3u8.LOCAL_KEY_FILE_NAME).append("\"");
             if (seg.encryptInfo().encryptKeyIV() != null && seg.encryptInfo().encryptKeyIV().length() > 0) {
@@ -62,19 +62,19 @@ public class PartM3u8 implements M3u8{
             sb.append("\n");
         }
         sb.append(TAG_SEQUENCE).append(":").append(this.sequence).append("\n");
-        for (TsSegment segment : this.segments) {
+        for (Segment segment : this.segments) {
             sb.append(TAG_INF).append(":").append(segment.duration()).append(",");
             if (segment.extraInfo() != null && segment.extraInfo().length() > 0) {
                 sb.append(segment.extraInfo());
             }
-            sb.append("\n").append(segment.localTsName(this.parentSequence)).append("\n");
+            sb.append("\n").append(segment.localSegName(this.parentSequence)).append("\n");
         }
         return sb.append(TAG_END).toString();
     }
 
     public boolean isEncrypt() {
         if (this.segments != null && this.segments.size() > 0) {
-            TsSegment seg = this.segments.get(0);
+            Segment seg = this.segments.get(0);
             return seg.encryptInfo() != null && !seg.encryptInfo().encryptedMethod().equals("NONE");
         }
         return false;
@@ -120,8 +120,13 @@ public class PartM3u8 implements M3u8{
     }
 
     @Override
-    public List<TsSegment> segments() {
+    public List<Segment> segments() {
         return this.segments;
+    }
+
+    @Override
+    public String videoHeadURI() {
+        return "";
     }
 
     public int getPartition() {
@@ -164,11 +169,11 @@ public class PartM3u8 implements M3u8{
         this.allowCache = allowCache;
     }
 
-    public List<TsSegment> getSegments() {
+    public List<Segment> getSegments() {
         return segments;
     }
 
-    public void setSegments(List<TsSegment> segments) {
+    public void setSegments(List<Segment> segments) {
         this.segments = segments;
     }
 

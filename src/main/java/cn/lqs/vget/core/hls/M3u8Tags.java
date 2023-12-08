@@ -18,4 +18,9 @@ public class M3u8Tags {
     public final static String TAG_ALLOW_CACHE_TRUE = "YES";
     public final static String TAG_ALLOW_CACHE_FALSE = "NO";
     public final static String TAG_STREAM_INF = "#EXT-X-STREAM-INF";
+
+    /**
+     * Specifies the media initialization section for a media file
+     */
+    public final static String TAG_X_MAP = "#EXT-X-MAP";
 }

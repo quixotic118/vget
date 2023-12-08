@@ -21,5 +21,7 @@ public interface M3u8 extends Video {
 
     boolean isAllowCache();
 
-    List<TsSegment> segments();
+    List<Segment> segments();
+
+    String videoHeadURI();
 }

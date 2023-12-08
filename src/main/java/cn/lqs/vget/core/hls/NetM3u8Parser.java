@@ -21,7 +21,7 @@ import static cn.lqs.vget.core.common.utils.HttpUtils.isSuccess;
 import static cn.lqs.vget.core.hls.M3u8Tags.*;
 
 
-public class NetM3u8Parser implements M3u8Parser{
+public class NetM3u8Parser implements M3u8Parser {
 
     private final static Logger log = LoggerFactory.getLogger(NetM3u8Parser.class);
 
@@ -29,7 +29,7 @@ public class NetM3u8Parser implements M3u8Parser{
     private final HttpHeader[] httpHeaders;
     private final HttpClient httpClient;
 
-    protected NetM3u8Parser(URI indexUri, HttpClient httpClient, HttpHeader[] httpHeaders){
+    protected NetM3u8Parser(URI indexUri, HttpClient httpClient, HttpHeader[] httpHeaders) {
         this.indexUri = indexUri;
         this.httpHeaders = httpHeaders;
         this.httpClient = httpClient;
@@ -73,7 +73,7 @@ public class NetM3u8Parser implements M3u8Parser{
         }
         return null;
     }
-    
+
     private M3u8 parseSs(Stream<String> ss, String baseUrl) throws M3uTagParsedException, HttpUrlHrefException {
         Iterator<String> iter = ss.iterator();
         // 检查头标签
@@ -92,13 +92,14 @@ public class NetM3u8Parser implements M3u8Parser{
         int version = 0;
         int sequence = 0;
         String playlistType = "";
+        String videoHeadUrl = "";
         boolean allowCache = false;
         EncryptInfo encryptInfo = null;
         // 遍历所有的头部标签
         while (secTag != null) {
             if (secTag.startsWith(TAG_TARGETDURATION)) {
                 maxDuration = Double.parseDouble(extractHTagValue(secTag));
-            } else if (secTag.startsWith(TAG_VERSION)){
+            } else if (secTag.startsWith(TAG_VERSION)) {
                 version = Integer.parseInt(extractHTagValue(secTag));
             } else if (secTag.startsWith(TAG_SEQUENCE)) {
                 sequence = Integer.parseInt(extractHTagValue(secTag));
@@ -112,6 +113,8 @@ public class NetM3u8Parser implements M3u8Parser{
                 allowCache = extractHTagValue(secTag).equals(TAG_ALLOW_CACHE_TRUE);
             } else if (secTag.startsWith(TAG_KEY)) {
                 encryptInfo = parseEncryptInfoFromKeyTag(secTag, baseUrl);
+            } else if (secTag.startsWith(TAG_X_MAP)) {
+                videoHeadUrl = UrlUtils.mockHref(baseUrl, extractVideoHeadUrl(secTag));
             } else if (secTag.startsWith(TAG_INF)) {
                 // 跳出头部标签, 进入 segment 标签解析
                 break;
@@ -120,12 +123,12 @@ public class NetM3u8Parser implements M3u8Parser{
             }
             secTag = findNextSafely(iter);
         }
-        ArrayList<TsSegment> segments = parseAllSegments(secTag, iter, baseUrl, encryptInfo);
-        return new ImmutableNetM3u8(httpHeaders, baseUrl, maxDuration, version, sequence, playlistType, allowCache, segments);
+        ArrayList<Segment> segments = parseAllSegments(secTag, iter, baseUrl, encryptInfo);
+        return new ImmutableNetM3u8(httpHeaders, baseUrl, maxDuration, version, sequence, playlistType, allowCache, segments, videoHeadUrl);
     }
 
-    private ArrayList<TsSegment> parseAllSegments(String secTag, Iterator<String> iter, String baseUrl, EncryptInfo encryptCtx) throws HttpUrlHrefException, M3uTagParsedException {
-        ArrayList<TsSegment> segments = new ArrayList<>(1 << 6);
+    private ArrayList<Segment> parseAllSegments(String secTag, Iterator<String> iter, String baseUrl, EncryptInfo encryptCtx) throws HttpUrlHrefException, M3uTagParsedException {
+        ArrayList<Segment> segments = new ArrayList<>(1 << 6);
         // 解析所有的 segment
         int counter = 1;
         int partition = 0;
@@ -134,7 +137,7 @@ public class NetM3u8Parser implements M3u8Parser{
                 if (secTag.startsWith(TAG_END)) {
                     // 结束标记
                     break;
-                }else if (secTag.startsWith(TAG_DISCONTINUITY)) {
+                } else if (secTag.startsWith(TAG_DISCONTINUITY)) {
                     partition++;
                 } else if (secTag.startsWith(TAG_KEY)) {
                     encryptCtx = parseEncryptInfoFromKeyTag(secTag, baseUrl);
@@ -152,11 +155,31 @@ public class NetM3u8Parser implements M3u8Parser{
                 extraInfo = spInf[1];
             }
             var tsUrl = findNextSafely(iter);
-            segments.add(new TsSegment(counter, UrlUtils.mockHref(baseUrl, tsUrl), tsDuration, extraInfo, partition, encryptCtx));
+            segments.add(new Segment(counter, UrlUtils.mockHref(baseUrl, tsUrl), tsDuration, extraInfo, partition, encryptCtx));
             counter++;
             secTag = findNextSafely(iter);
         }
         return segments;
+    }
+
+    private String extractVideoHeadUrl(String tagStr) {
+        tagStr = tagStr.substring(TAG_X_MAP.length()).trim();
+        int startIdx = -1, endIdx = -1;
+        for (int i = 0; i < tagStr.length(); i++) {
+            if (tagStr.charAt(i) == '"') {
+                if (startIdx == -1) {
+                    startIdx = i;
+                    continue;
+                }
+                endIdx = i;
+                break;
+            }
+        }
+        if (startIdx == -1 || endIdx == -1) {
+            log.warn("Parse Tag [{}] failed! with value -> [{}].", TAG_X_MAP, tagStr);
+            return "";
+        }
+        return tagStr.substring(startIdx + 1, endIdx);
     }
 
     private EncryptInfo parseEncryptInfoFromKeyTag(String keyTag, String baseUrl) throws M3uTagParsedException, HttpUrlHrefException {
@@ -198,7 +221,7 @@ public class NetM3u8Parser implements M3u8Parser{
         while (iter.hasNext()) {
             String next = iter.next();
             if (!next.trim().isEmpty()) {
-                return next; 
+                return next;
             }
         }
         return null;

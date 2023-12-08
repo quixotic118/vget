@@ -5,13 +5,15 @@ import cn.lqs.vget.core.common.utils.VFileUtils;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 
+import static cn.lqs.vget.core.common.Constants.MERGE_ALL_SEGMENTS_NAME;
 import static cn.lqs.vget.core.common.Constants.MERGE_OUTPUT_NAME;
 
 /**
@@ -22,9 +24,11 @@ public class PartedLocalHlsCached {
 
     // 分片目录路径
     private final List<Path> partPaths;
+    private final HlsVGet hlsVGet;
 
-    protected PartedLocalHlsCached(List<Path> partPaths) {
+    protected PartedLocalHlsCached(List<Path> partPaths, HlsVGet hlsVGet) {
         this.partPaths = partPaths;
+        this.hlsVGet = hlsVGet;
     }
 
     /**
@@ -57,44 +61,49 @@ public class PartedLocalHlsCached {
      * @return {@link Path}
      */
     public Path getLargestPartPath() {
-        Path largestPartPath = null;
-        int largestPartSize = 0;
-        for (Path partPath : partPaths) {
-            File[] pieces = partPath.toFile().listFiles();
-            int pieceCount = pieces == null ? 0 : pieces.length;
-            if (largestPartPath == null) {
-                largestPartPath = partPath;
-                largestPartSize = pieceCount;
-                continue;
-            }
-            if (pieceCount > largestPartSize) {
-                largestPartPath = partPath;
-                largestPartSize = pieceCount;
+        File[] fs = new File(this.hlsVGet.getCacheDir()).listFiles();
+        assert fs != null;
+        int maxNum = 0;
+        Path maxPath = null;
+        for (File f : fs) {
+            File[] subFs = f.listFiles();
+            int num = subFs == null ? 0 : subFs.length;
+            if (num > maxNum) {
+                maxNum = num;
+                maxPath = Path.of(this.hlsVGet.getCacheDir(), f.getName());
             }
         }
-        return largestPartPath;
+        return maxPath;
     }
 
-
-    public void mergeLargestPart(FfmpegUtils ffmpegUtils) throws IOException {
-        final String dir = getLargestPartPath().toAbsolutePath().toString();
-
-        File[] files = new File(dir).listFiles();
+    /**
+     * list and sort all local segment files in the specified direction
+     * @param dir the specified direction
+     * @return sorted segments
+     */
+    private ArrayList<LocalSegment> getSortedLocalSegments(Path dir) {
+        File[] files = dir.toFile().listFiles();
         assert files != null;
 
-        // 先搜集所有 TS 片段
-        ArrayList<LocalTsSegFile> sorted = new ArrayList<>(1 << 6);
+        // first search all segments
+        ArrayList<LocalSegment> sorted = new ArrayList<>(1 << 6);
         for (File file : files) {
             if (file.getName().startsWith(M3u8.LOCAL_SEGMENT_NAME_PREFIX)) {
                 String fn = file.getName();
-                sorted.add(new LocalTsSegFile(Integer.parseInt(fn.substring(fn.lastIndexOf('-') + 1)), file.getAbsolutePath()));
+                sorted.add(new LocalSegment(Integer.parseInt(fn.substring(fn.lastIndexOf('-') + 1)), file.getAbsolutePath()));
             }
         }
-        // 确保顺序
-        sorted.sort(Comparator.comparingInt(LocalTsSegFile::getOrder));
-        // 生成 file list
+        // make sure the order
+        sorted.sort(Comparator.comparingInt(LocalSegment::getOrder));
+        return sorted;
+    }
+
+    public void mergeLargestPart(FfmpegUtils ffmpegUtils) throws IOException {
+        Path largestPartPath = getLargestPartPath();
+        String dir = largestPartPath.toAbsolutePath().toString();
+        // generate file list
         StringBuilder sb = new StringBuilder();
-        for (LocalTsSegFile tsF : sorted) {
+        for (LocalSegment tsF : getSortedLocalSegments(largestPartPath)) {
             sb.append("file '").append(tsF.getPath()).append("'").append("\n");
         }
 
@@ -104,9 +113,29 @@ public class PartedLocalHlsCached {
         ffmpegUtils.mergeTs(fileList, Path.of(dir, MERGE_OUTPUT_NAME));
     }
 
+    public void merge2OneFile(String type) throws Exception{
+        merge2OneFile(getLargestPartPath(), type);
+    }
     /**
-     *删除已经完成合并的分片目录,并将合并后的视频文件移动到分片目录的上一级目录
-     * @throws IOException IO异常
+     *
+     */
+    public void merge2OneFile(Path dir, String type) throws Exception {
+        byte[] videoHeadBytes = this.hlsVGet.fetchVideoHead();
+        File tarF = dir.resolve(MERGE_ALL_SEGMENTS_NAME + "." + type).toFile();
+        ArrayList<LocalSegment> localSegments = getSortedLocalSegments(dir);
+        try (FileOutputStream fos = new FileOutputStream(tarF)){
+            fos.write(videoHeadBytes);
+            for (LocalSegment seg : localSegments) {
+                try (FileInputStream fis = new FileInputStream(new File(seg.getPath()))){
+                    fos.write(fis.readAllBytes());
+                }
+            }
+        }
+    }
+
+    /**
+     * Delete the merged shard directory and move the merged video files to the directory one level above the shard directory
+     * @throws IOException IO Exception
      */
     public String clearMergedPartDirAndGetFinalVideo(String filename) throws IOException {
         for (Path partPath : partPaths) {

@@ -32,14 +32,14 @@ public class HlsVGet {
     private final HttpClient httpClient;
     private String cacheDir;
 
-    private volatile List<TsSegment> failedSegments;
+    private volatile List<Segment> failedSegments;
 
     public HlsVGet(NetM3u8 netM3u8, HttpClient httpClient) {
         this.netM3u8 = netM3u8;
         this.httpClient = httpClient;
     }
 
-    protected List<TsSegment> getFailedSegments() {
+    protected List<Segment> getFailedSegments() {
         return this.failedSegments;
     }
 
@@ -88,8 +88,8 @@ public class HlsVGet {
             return;
         }
         int sequenceOrder = netM3u8.sequence() == 0 ? 0 : netM3u8.sequence();
-        final ArrayList<TsSegment> newFailedSegments = new ArrayList<>();
-        for (TsSegment segment : this.failedSegments) {
+        final ArrayList<Segment> newFailedSegments = new ArrayList<>();
+        for (Segment segment : this.failedSegments) {
             downloadSegment(sequenceOrder, segment, true, newFailedSegments);
         }
         this.failedSegments = newFailedSegments;
@@ -107,7 +107,7 @@ public class HlsVGet {
         final CountDownLatch latch = new CountDownLatch(netM3u8.segments().size());
         int sequenceOrder = netM3u8.sequence() == 0 ? 0 : netM3u8.sequence();
         log.info("the hls segment begin sequence -> [{}]", sequenceOrder);
-        for (TsSegment segment : netM3u8.segments()) {
+        for (Segment segment : netM3u8.segments()) {
             pool.execute(()->{
                 try {
                     downloadSegment(sequenceOrder, segment);
@@ -130,13 +130,13 @@ public class HlsVGet {
         log.warn("begin single thread download...");
         int sequenceOrder = netM3u8.sequence() == 0 ? 0 : netM3u8.sequence();
         log.info("the hls segment begin sequence -> [{}]", sequenceOrder);
-        for (TsSegment segment : netM3u8.segments()) {
+        for (Segment segment : netM3u8.segments()) {
             downloadSegment(sequenceOrder, segment);
         }
     }
 
-    protected byte[] fetchKeyBytes(String keyUri) throws IOException, InterruptedException {
-        HttpResponse<byte[]> response = httpClient.send(HttpUtils.getRequest(keyUri, netM3u8.customHeaders()),
+    private byte[] fetchBytes(String uri) throws IOException, InterruptedException {
+        HttpResponse<byte[]> response = httpClient.send(HttpUtils.getRequest(uri, netM3u8.customHeaders()),
                 HttpResponse.BodyHandlers.ofByteArray());
         HttpLogger.logResponse(response);
         if (HttpUtils.isSuccess(response.statusCode())) {
@@ -145,12 +145,28 @@ public class HlsVGet {
         throw new IOException("invalid response code " + response.statusCode());
     }
 
-    private void downloadSegment(int sequenceOrder, TsSegment segment){
+    protected byte[] fetchKeyBytes(String keyUri) throws IOException, InterruptedException {
+        return fetchBytes(keyUri);
+    }
+
+    protected byte[] fetchVideoHead() throws IOException, InterruptedException {
+        if (this.netM3u8.videoHeadURI().isEmpty()) {
+            return new byte[0];
+        }
+        log.info("Try fetch video head with url -> [{}]", this.netM3u8.videoHeadURI());
+        return fetchBytes(this.netM3u8.videoHeadURI());
+    }
+
+    private void downloadSegment(int sequenceOrder, Segment segment){
         downloadSegment(sequenceOrder, segment, false, null);
     }
 
-    private void downloadSegment(int sequenceOrder, TsSegment segment, boolean retryMode, ArrayList<TsSegment> newFailedSegments) {
-        Path dst = Path.of(this.cacheDir, segment.localTsName(sequenceOrder));
+    private void downloadSegment(int sequenceOrder, Segment segment, boolean retryMode, ArrayList<Segment> newFailedSegments) {
+        Path dst = Path.of(this.cacheDir, segment.localSegName(sequenceOrder));
+        if (dst.toFile().exists()) {
+            log.info("Target File exist -> [{}]", dst.toString());
+            return;
+        }
         try {
             log.info("Thread-[{}] Try download [{}] to local [{}]", Thread.currentThread().getName(), segment.url().split("\\?")[0], dst);
             HttpResponse<InputStream> response = httpClient.send(HttpUtils.getRequest(segment.url(),

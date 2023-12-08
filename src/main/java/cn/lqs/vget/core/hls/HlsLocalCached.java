@@ -44,7 +44,7 @@ public class HlsLocalCached {
     public int countPartition() {
         if (countPartitionCache == 0) {
             int max = 0;
-            for (TsSegment segment : this.hlsVGet.getNetM3u8().segments()) {
+            for (Segment segment : this.hlsVGet.getNetM3u8().segments()) {
                 if (segment.partition() > max) {
                     max = segment.partition();
                 }
@@ -55,15 +55,15 @@ public class HlsLocalCached {
     }
 
     private List<PartM3u8> partition() {
-        Map<Integer, List<TsSegment>> sortMap = new HashMap<>();
-        for (TsSegment segment : this.hlsVGet.getNetM3u8().segments()) {
+        Map<Integer, List<Segment>> sortMap = new HashMap<>();
+        for (Segment segment : this.hlsVGet.getNetM3u8().segments()) {
             if (!sortMap.containsKey(segment.partition())) {
-                sortMap.put(segment.partition(), new ArrayList<TsSegment>(1 << 4));
+                sortMap.put(segment.partition(), new ArrayList<Segment>(1 << 4));
             }
             sortMap.get(segment.partition()).add(segment);
         }
         List<PartM3u8> partM3u8s = new ArrayList<>(1 << 2);
-        for (Map.Entry<Integer, List<TsSegment>> entry : sortMap.entrySet()) {
+        for (Map.Entry<Integer, List<Segment>> entry : sortMap.entrySet()) {
             NetM3u8 netM3u8 = this.hlsVGet.getNetM3u8();
             PartM3u8 partM3u8 = new PartM3u8(entry.getKey(), netM3u8.sequence());
             partM3u8.setAllowCache(true);
@@ -82,8 +82,8 @@ public class HlsLocalCached {
     }
 
     /**
-     * 标准化分片
-     * @param autoDecode 是否自动解密
+     * standardize the partitions
+     * @param autoDecode enable auto decode?
      * @return {@link PartedLocalHlsCached}
      */
     public PartedLocalHlsCached standardizePartition(boolean autoDecode) {
@@ -92,7 +92,7 @@ public class HlsLocalCached {
         for (PartM3u8 partM3u8 : partition()) {
             try {
                 Path dir = Path.of(cachedDir, "part-" + partM3u8.getPartition());
-                if (!dir.toFile().mkdirs()) {
+                if (!dir.toFile().exists() && !dir.toFile().mkdirs()) {
                     throw new IOException("create dir fail! " + dir.toString());
                 }
                 byte[] bytes = null;
@@ -107,9 +107,9 @@ public class HlsLocalCached {
                         iv = extractIVBytes(partM3u8.getIV());
                     }
                 }
-                // 转移 segment
-                for (TsSegment segment : partM3u8.getSegments()) {
-                    String fn = segment.localTsName(this.hlsVGet.getNetM3u8().sequence());
+                // translate segment
+                for (Segment segment : partM3u8.getSegments()) {
+                    String fn = segment.localSegName(this.hlsVGet.getNetM3u8().sequence());
                     File srcF = Path.of(cachedDir, fn).toFile();
                     if (!srcF.exists()) {
                         continue;
@@ -133,7 +133,7 @@ public class HlsLocalCached {
                 log.error("standardize partition-{} failed!", partM3u8.getPartition(), e);
             }
         }
-        return new PartedLocalHlsCached(partDirs);
+        return new PartedLocalHlsCached(partDirs, hlsVGet);
     }
 
     private byte[] extractIVBytes(String iv) throws DecodeFailException {
