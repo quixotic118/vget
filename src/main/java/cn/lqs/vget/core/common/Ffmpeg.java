@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 
 import static cn.lqs.vget.core.common.Constants.MERGE_OUTPUT_NAME;
 
+@Deprecated
 public class Ffmpeg {
 
     private final static Logger log = LoggerFactory.getLogger(Ffmpeg.class);
